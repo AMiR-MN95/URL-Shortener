@@ -1,10 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"math/rand"
 	"net/http"
 	"time"
+)
+
+const (
+	charset        = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	shortURLLength = 6
 )
 
 type ShortURL struct {
@@ -14,20 +20,9 @@ type ShortURL struct {
 
 var urlMap = make(map[string]ShortURL)
 
-// Generate Short URLs
-
-const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-
-func generateShortURL() string {
+func init() {
 	rand.Seed(time.Now().UnixNano())
-	b := make([]byte, 6)
-	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
-	}
-	return string(b)
 }
-
-// Initialize Gin
 
 func main() {
 	router := gin.Default()
@@ -35,16 +30,25 @@ func main() {
 	router.POST("/shorten", shortenURL)
 	router.GET("/:shortURL", redirectURL)
 
-	router.Run(":8080")
+	if err := router.Run(":8080"); err != nil {
+		fmt.Println("Error starting the Server:", err)
+	}
 }
 
-// Shorten URL Handler
+func generateShortURL() string {
+	b := make([]byte, shortURLLength)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
+}
+
 func shortenURL(c *gin.Context) {
 	var requestBody struct {
 		Original string `json:"original"`
 	}
 
-	if err := c.BindJSON(&requestBody); err != nil {
+	if err := c.ShouldBindJSON(&requestBody); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 		return
 	}
@@ -55,7 +59,6 @@ func shortenURL(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"short.url": shortURL})
 }
 
-// Redirect URL Handler
 func redirectURL(c *gin.Context) {
 	shortURL := c.Param("shortURL")
 	url, exists := urlMap[shortURL]
